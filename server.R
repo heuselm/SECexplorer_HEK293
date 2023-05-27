@@ -15,6 +15,7 @@ library(plotly)
 
 # load data
 protTraces <- readRDS("data/protTraces.rds")
+pepTraces <- readRDS("data/pepTraces_cons_sib.rds")
 calibration_functions = readRDS("data/calibration.rds")
 
 # assign annotation columns to vectors
@@ -35,6 +36,16 @@ shinyServer(function(input, output) {
                    multiple = TRUE, 
                    options = list(maxOptions = 60000),
                    selected = sort(protTraces$trace_annotation$Gene_names[grep("COPS", protTraces$trace_annotation$Gene_names)]))
+  })
+  
+  output$poiselect <- renderUI({
+    values <- sort(unique(get(input$fcolumn)))
+    # values <- values[nchar(values)>0]
+    selectizeInput("poi", "Protein of interest for peptide plot",
+                   values,
+                   multiple = FALSE, 
+                   options = list(maxOptions = 60000),
+                   selected = sort(protTraces$trace_annotation$Gene_names[grep("COPS", protTraces$trace_annotation$Gene_names)][1]))
   })
   
   ## generate selected protein SEC traces plot
@@ -87,4 +98,47 @@ shinyServer(function(input, output) {
     # and subset the data for these, including Mass column
     protTraces.s$trace_annotation[, id:=NULL]
   })
+  
+  ## Peptide plots
+  ################
+  # peplineplot
+  output$peplineplot <- renderPlotly({
+    
+    # Collect indices of the proteins matching the selection 
+    # pepindices <- grep(input$poi[1], pepTraces$trace_annotation$input$fcolumn)
+    
+    # pepindices <- grep("CSN5", pepTraces$trace_annotation$"Gene_names")
+    
+    # subset the data for these, including Mass column
+    pepTraces.s <- subset(pepTraces, trace_subset_type = input$fcolumn,
+                          trace_subset_ids = input$poi)
+    
+    # Plot
+    peptraces.long <- toLongFormat(pepTraces.s$traces)
+    peptraces.long <- merge(peptraces.long, pepTraces.s$trace_annotation, by = "id", all.y = FALSE, all.x = TRUE)
+    p <- ggplot(peptraces.long) +
+      xlab('fraction') + ylab('Top6 Transition Sum MS Intensity') + 
+      theme_bw() +
+      theme(legend.position=input$legend.position) +
+      # ggtitle(paste(unique(traces.long$Gene_names), unique(traces.long$Entry_name)))
+      ggtitle(input$poi)
+    if (is.null(calibration_functions)){
+      q <- p + geom_line(aes(x=fraction, y=intensity, color=id))
+      ggplotly(q)
+    } else {
+      lx.frc <- seq(10,(ncol(pepTraces.s$traces)-1),10)
+      lx <- paste( lx.frc , round(calibration_functions$FractionToMW(lx.frc), 1) , sep = '\n' )
+      
+      q <- p + geom_line(aes(x=fraction, y=intensity, color=id)) +
+        scale_x_continuous(breaks = lx.frc , labels = lx) + xlab("fraction\n(apparent MW [kDa])")
+      
+      if(input$show_monomer_markers == TRUE){
+        q <- q + geom_point(aes(x = calibration_functions$MWtoFraction(protein_mw), y = -10, color = Gene_names), pch = 23, fill = "white", size =2)
+      }
+      
+      ggplotly(q)
+    }
+  })
+  
+  
 })

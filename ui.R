@@ -41,14 +41,23 @@ shinyUI(pageWithSidebar(
     
     textInput("legend.position", label = "Plot legend position (or \"none\")", value = "right"),
     
-    p("Select genes/protein of interest above to display elution profiles."),
+    p("Select genes/proteins of interest above to display elution profiles."),
+    
+    p("For peptide traces, Select one gene/protein of interest here:"),
+    
+    uiOutput("poiselect"),
+    
+    
     p("Reference:\n \nHeusel & Bludau et. al. Mol Syst Biol. 2019 Jan 14;15(1):e8438. doi: 10.15252/msb.20188438"),
     p("Contact:\naebersold@imsb.biol.ethz.ch\nmoritz.heusel@med.lu.se")
   ),
   
   # mainPanel: Show interactive line plot the selected Traces
   mainPanel(
-    plotlyOutput("plot"),
-    DT::dataTableOutput("table")
+    tabsetPanel(
+      tabPanel("Protein Profiles", plotlyOutput("plot"), DT::dataTableOutput("table")),
+      tabPanel("Peptide Profiles", plotlyOutput("peplineplot"))
+      )
+    )
   )
-))
+)
